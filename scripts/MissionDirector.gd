@@ -2,54 +2,40 @@ extends Node
 class_name MissionDirector
 
 signal objective_changed(title: String, description: String)
-signal mission_completed(id: String)
-signal phase_changed(phase: String)
+signal mission_phase_changed(phase: String)
 
-var phase := "PREPARATION"
-var active_objective := "activate_systems"
-var objectives := {
-    "activate_systems": {"title": "Acordar a nave", "description": "Ative o reator e o suporte de vida.", "done": false},
-    "calibrate_sensors": {"title": "Calibrar sensores", "description": "Ligue comunicação e laboratório e analise o sinal.", "done": false},
-    "decode_signal": {"title": "Decodificar LASTLIGHT", "description": "Complete cinco leituras do padrão desconhecido.", "done": false},
-    "prepare_launch": {"title": "Preparar lançamento", "description": "Conclua a análise e verifique o combustível.", "done": false}
-}
-var scans := 0
+var current_phase := "EARTH_PREP"
 
 func _ready() -> void:
-    GameState.log_added.connect(_on_log)
-    objective_changed.emit(objectives[active_objective].title, objectives[active_objective].description)
+    GameState.objective_changed.connect(_on_objective_changed)
+    GameState.mission_phase_changed.connect(_on_phase_changed)
+    _apply_phase("EARTH_PREP")
 
 func _process(_delta: float) -> void:
-    if active_objective == "activate_systems" and GameState.systems.power and GameState.systems.life_support:
-        _complete("activate_systems", "Sistemas primários estabilizados.")
-        _set_objective("calibrate_sensors")
-    elif active_objective == "calibrate_sensors" and GameState.systems.comms and GameState.systems.science:
-        _complete("calibrate_sensors", "Matriz científica pronta.")
-        _set_objective("decode_signal")
-    elif active_objective == "decode_signal" and scans >= 5:
-        _complete("decode_signal", "O sinal responde às suas medições.")
-        _set_objective("prepare_launch")
-    elif active_objective == "prepare_launch" and GameState.anomaly_progress >= 100.0 and GameState.resources.fuel >= 50.0:
-        _complete("prepare_launch", "A janela de lançamento foi aberta.")
-        phase = "LAUNCH_READY"
-        phase_changed.emit(phase)
-        GameState.log_added.emit("IA: janela de lançamento calculada. A missão pode começar.", "critical")
+    if current_phase == "EARTH_PREP":
+        if GameState.systems.reactor and GameState.systems.life_support and GameState.systems.comms and GameState.systems.science:
+            GameState.advance_phase("LAUNCH")
+            _apply_phase("LAUNCH")
+    elif current_phase == "LAUNCH":
+        if GameState.anomaly_progress >= 100.0 and GameState.resources.fuel >= 50.0:
+            GameState.advance_phase("SPACE_TRAVEL")
+            _apply_phase("SPACE_TRAVEL")
 
-func register_scan() -> void:
-    scans += 1
-    GameState.scan_anomaly()
+func _apply_phase(name: String) -> void:
+    current_phase = name
+    match name:
+        "EARTH_PREP":
+            GameState.set_objective("Preparar a missão", "Ative reator, suporte de vida, comunicação e laboratório antes do lançamento.")
+            GameState.log_added.emit("Objetivo inicial: preparar a nave para a missão de partida.", "good")
+        "LAUNCH":
+            GameState.set_objective("Lançamento", "Conclua o diagnóstico do sinal e valide os sistemas para partir.")
+            GameState.log_added.emit("Lançamento liberado. O sinal responde ao laboratório.", "critical")
+        "SPACE_TRAVEL":
+            GameState.set_objective("Viagem espacial", "A nave deve deixar o sistema terrestre e avançar rumo ao desconhecido.")
+            GameState.log_added.emit("Sistema de propulsão otimizado. O campo de viagem foi aberto.", "critical")
 
-func _set_objective(id: String) -> void:
-    active_objective = id
-    objective_changed.emit(objectives[id].title, objectives[id].description)
-    GameState.log_added.emit("OBJETIVO: " + objectives[id].title, "good")
+func _on_objective_changed(_title: String, _description: String) -> void:
+    pass
 
-func _complete(id: String, message: String) -> void:
-    if objectives[id].done:
-        return
-    objectives[id].done = true
-    mission_completed.emit(id)
-    GameState.log_added.emit(message, "good")
-
-func _on_log(_message: String, _severity: String) -> void:
+func _on_phase_changed(_phase: String) -> void:
     pass

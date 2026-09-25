@@ -6,12 +6,11 @@ extends CharacterBody3D
 @export var acceleration := 18.0
 @export var gravity := 18.0
 
-var camera: Camera3D
 var pitch := 0.0
+var camera: Camera3D
 
 func _ready() -> void:
     camera = Camera3D.new()
-    camera.name = "PlayerCamera"
     camera.position = Vector3(0.0, 1.55, 0.0)
     camera.current = true
     add_child(camera)
@@ -34,11 +33,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
     var input_vec := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-    var move_dir := (transform.basis * Vector3(input_vec.x, 0.0, input_vec.y)).normalized()
-    var speed := sprint_speed if Input.is_action_pressed("sprint") else walk_speed
+    var direction := (transform.basis * Vector3(input_vec.x, 0.0, input_vec.y)).normalized()
+    var target_speed := sprint_speed if Input.is_action_pressed("sprint") else walk_speed
 
-    velocity.x = move_toward(velocity.x, move_dir.x * speed, acceleration * delta)
-    velocity.z = move_toward(velocity.z, move_dir.z * speed, acceleration * delta)
+    velocity.x = move_toward(velocity.x, direction.x * target_speed, acceleration * delta)
+    velocity.z = move_toward(velocity.z, direction.z * target_speed, acceleration * delta)
 
     if not is_on_floor():
         velocity.y -= gravity * delta
@@ -48,9 +47,9 @@ func _physics_process(delta: float) -> void:
     move_and_slide()
 
 func _interact() -> void:
-    var from := camera.global_position
-    var to := from - camera.global_transform.basis.z * 3.0
-    var query := PhysicsRayQueryParameters3D.create(from, to)
+    var origin := camera.global_position
+    var target := origin - camera.global_transform.basis.z * 3.0
+    var query := PhysicsRayQueryParameters3D.create(origin, target)
     query.exclude = [self]
     var result := get_world_3d().direct_space_state.intersect_ray(query)
     if not result.is_empty() and result.collider.has_method("interact"):

@@ -1,8 +1,11 @@
 extends Node
+class_name GameState
 
 signal resources_changed(resources: Dictionary)
 signal log_added(message: String, severity: String)
 signal anomaly_changed(value: float)
+signal objective_changed(title: String, description: String)
+signal mission_phase_changed(phase: String)
 
 var resources := {
     "energy": 82.0,
@@ -14,61 +17,85 @@ var resources := {
 }
 
 var systems := {
-    "power": false,
+    "reactor": false,
     "life_support": false,
     "comms": false,
-    "science": false
+    "science": false,
+    "thrusters": false,
+    "navigation": false
 }
 
-var mission_time := 0.0
+var phase := "EARTH_PREP"
 var anomaly_progress := 0.0
+var ticks := 0.0
+var max_scan_count := 5
+var scans_performed := 0
+var objective_title := "Preparar a missão"
+var objective_description := "Acorde a nave, estabilize os sistemas e prepare o lançamento."
 
 func _ready() -> void:
     set_process(true)
+    emit_signal("objective_changed", objective_title, objective_description)
+    emit_signal("mission_phase_changed", phase)
 
 func _process(delta: float) -> void:
-    mission_time += delta
+    ticks += delta
+    _simulate_resources(delta)
 
-    if systems.power:
-        resources.energy = max(0.0, resources.energy - delta * 0.012)
-
+func _simulate_resources(delta: float) -> void:
+    if systems.reactor:
+        resources.energy = max(0.0, resources.energy - delta * 0.014)
+        resources.fuel = max(0.0, resources.fuel - delta * 0.006)
     if systems.life_support:
-        resources.oxygen = min(100.0, resources.oxygen + delta * 0.018)
-        resources.temperature = move_toward(resources.temperature, 21.0, delta * 0.025)
+        resources.oxygen = min(100.0, resources.oxygen + delta * 0.02)
+        resources.temperature = move_toward(resources.temperature, 21.0, delta * 0.02)
     else:
-        resources.oxygen = max(0.0, resources.oxygen - delta * 0.008)
-        resources.temperature = move_toward(resources.temperature, 14.0, delta * 0.012)
+        resources.oxygen = max(0.0, resources.oxygen - delta * 0.009)
+        resources.temperature = move_toward(resources.temperature, 14.0, delta * 0.014)
 
-    resources.radiation = clamp(resources.radiation + sin(mission_time * 0.17) * delta * 0.05, 0.0, 100.0)
-    resources.signal = clamp(resources.signal - delta * 0.006, 0.0, 100.0)
+    if systems.comms:
+        resources.signal = min(100.0, resources.signal + delta * 0.03)
+    else:
+        resources.signal = max(0.0, resources.signal - delta * 0.02)
+
+    resources.radiation = clamp(resources.radiation + sin(ticks * 0.12) * delta * 0.05, 0.0, 100.0)
     resources_changed.emit(resources)
 
-func toggle_system(system_id: String) -> String:
-    if not systems.has(system_id):
+func toggle_system(id: String) -> String:
+    if not systems.has(id):
         return "UNKNOWN"
-
-    systems[system_id] = not systems[system_id]
-    var state := "ONLINE" if systems[system_id] else "STANDBY"
-    var names := {
-        "power": "REATOR",
-        "life_support": "SUPORTE DE VIDA",
-        "comms": "COMUNICAÇÕES",
-        "science": "LABORATÓRIO"
-    }
-    log_added.emit("%s: estado %s" % [names[system_id], state], "good")
+    systems[id] = not systems[id]
+    var state := "ONLINE" if systems[id] else "STANDBY"
+    log_added.emit("%s: %s" % [id.to_upper(), state], "good")
     resources_changed.emit(resources)
     return state
 
-func scan_anomaly() -> void:
+func set_objective(title: String, description: String) -> void:
+    objective_title = title
+    objective_description = description
+    objective_changed.emit(title, description)
+
+func advance_phase(next_phase: String) -> void:
+    phase = next_phase
+    mission_phase_changed.emit(next_phase)
+
+func analyze_signal() -> void:
     if not systems.science or not systems.comms:
-        log_added.emit("Ative LABORATÓRIO e COMUNICAÇÕES antes da análise.", "warning")
+        log_added.emit("Ative LABORATÓRIO e COMUNICAÇÕES para analisar o sinal.", "warning")
         return
 
-    anomaly_progress = min(100.0, anomaly_progress + 18.0)
-    resources.signal = min(100.0, resources.signal + 24.0)
+    scans_performed += 1
+    anomaly_progress = min(100.0, anomaly_progress + 20.0)
+    resources.signal = min(100.0, resources.signal + 18.0)
     anomaly_changed.emit(anomaly_progress)
 
-    if anomaly_progress >= 100.0:
-        log_added.emit("PADRÃO DECODIFICADO: a última luz não é uma estrela.", "critical")
+    if scans_performed >= max_scan_count:
+        log_added.emit("PADRÃO PRINCIPAL DECODIFICADO: o sinal é estruturado, intencional e não natural.", "critical")
     else:
-        log_added.emit("Padrão ressonante isolado: %d%% analisado." % int(anomaly_progress), "good")
+        log_added.emit("Leitura %d/%d concluída. Padrão ressonante detectado." % [scans_performed, max_scan_count], "good")
+
+func reset_progress() -> void:
+    anomaly_progress = 0.0
+    scans_performed = 0
+    resources.signal = 0.0
+    anomaly_changed.emit(anomaly_progress)
