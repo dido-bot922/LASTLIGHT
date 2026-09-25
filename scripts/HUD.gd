@@ -5,6 +5,7 @@ var phase_label: Label
 var objective_label: RichTextLabel
 var log_label: RichTextLabel
 var signal_bar: ProgressBar
+var prompt_label: Label
 
 func _ready() -> void:
     var root := Control.new()
@@ -14,6 +15,7 @@ func _ready() -> void:
     _build_objective(root)
     _build_status(root)
     _build_signal(root)
+    _build_prompt(root)
     _build_log(root)
     GameState.resources_changed.connect(_on_resources_changed)
     GameState.objective_changed.connect(_on_objective_changed)
@@ -23,57 +25,44 @@ func _ready() -> void:
     _on_resources_changed(GameState.resources)
     _on_objective_changed(GameState.objective_title, GameState.objective_description)
     _on_phase_changed(GameState.phase)
+    var player := get_parent().get_node_or_null("Player")
+    if player != null and player.has_signal("interaction_target_changed"):
+        player.interaction_target_changed.connect(_on_prompt_changed)
+
+func _label(root: Control, text: String, position: Vector2, size: int, color: Color) -> Label:
+    var node := Label.new()
+    node.text = text
+    node.position = position
+    node.add_theme_font_size_override("font_size", size)
+    node.add_theme_color_override("font_color", color)
+    root.add_child(node)
+    return node
 
 func _build_header(root: Control) -> void:
-    var title := Label.new()
-    title.text = "LASTLIGHT"
-    title.position = Vector2(28, 24)
-    title.add_theme_font_size_override("font_size", 24)
-    title.add_theme_color_override("font_color", Color("bcecff"))
-    root.add_child(title)
-    phase_label = Label.new()
-    phase_label.position = Vector2(28, 58)
-    phase_label.add_theme_font_size_override("font_size", 11)
-    phase_label.add_theme_color_override("font_color", Color("7bb7d3"))
-    root.add_child(phase_label)
+    _label(root, "LASTLIGHT", Vector2(28, 24), 24, Color("bcecff"))
+    phase_label = _label(root, "", Vector2(30, 58), 11, Color("7bb7d3"))
+    _label(root, "AURORA-7  /  PESQUISA DE FRONTEIRA", Vector2(30, 77), 11, Color("71899e"))
 
 func _build_objective(root: Control) -> void:
     objective_label = RichTextLabel.new()
-    objective_label.position = Vector2(28, 100)
-    objective_label.size = Vector2(420, 110)
+    objective_label.position = Vector2(28, 105)
+    objective_label.size = Vector2(430, 95)
     objective_label.bbcode_enabled = true
-    objective_label.fit_content = true
+    objective_label.add_theme_font_size_override("normal_font_size", 15)
     root.add_child(objective_label)
 
 func _build_status(root: Control) -> void:
     var panel := ColorRect.new()
     panel.position = Vector2(28, 225)
     panel.size = Vector2(280, 210)
-    panel.color = Color(0.02, 0.05, 0.08, 0.9)
+    panel.color = Color(0.02, 0.05, 0.08, 0.90)
     root.add_child(panel)
-    var title := Label.new()
-    title.text = "SYSTEMS MONITOR"
-    title.position = Vector2(46, 242)
-    title.add_theme_font_size_override("font_size", 13)
-    title.add_theme_color_override("font_color", Color("62dfff"))
-    root.add_child(title)
-
-    var names := ["ENERGIA", "OXIGÊNIO", "COMBUSTÍVEL", "TEMPERATURA", "RADIAÇÃO"]
-    for i in range(names.size()):
-        var row := Label.new()
-        row.position = Vector2(46, 272 + i * 24)
-        row.add_theme_font_size_override("font_size", 12)
-        row.add_theme_color_override("font_color", Color("dfeaf4"))
-        root.add_child(row)
-        resource_labels.append(row)
+    _label(root, "SYSTEMS MONITOR", Vector2(46, 242), 13, Color("62dfff"))
+    for i in range(5):
+        resource_labels.append(_label(root, "", Vector2(46, 272 + i * 24), 12, Color("dfeaf4")))
 
 func _build_signal(root: Control) -> void:
-    var label := Label.new()
-    label.text = "ANOMALIA / LASTLIGHT"
-    label.position = Vector2(912, 24)
-    label.add_theme_font_size_override("font_size", 12)
-    label.add_theme_color_override("font_color", Color("62dfff"))
-    root.add_child(label)
+    _label(root, "ANOMALIA / LASTLIGHT", Vector2(912, 24), 12, Color("62dfff"))
     signal_bar = ProgressBar.new()
     signal_bar.position = Vector2(910, 48)
     signal_bar.size = Vector2(320, 16)
@@ -81,12 +70,17 @@ func _build_signal(root: Control) -> void:
     signal_bar.show_percentage = false
     root.add_child(signal_bar)
 
+func _build_prompt(root: Control) -> void:
+    prompt_label = _label(root, "", Vector2(505, 615), 15, Color("bcecff"))
+    prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    prompt_label.size.x = 270
+
 func _build_log(root: Control) -> void:
     log_label = RichTextLabel.new()
     log_label.position = Vector2(28, 600)
-    log_label.size = Vector2(760, 90)
+    log_label.size = Vector2(450, 90)
     log_label.bbcode_enabled = true
-    log_label.fit_content = true
+    log_label.add_theme_font_size_override("normal_font_size", 12)
     root.add_child(log_label)
 
 func _on_resources_changed(values: Dictionary) -> void:
@@ -107,6 +101,9 @@ func _on_phase_changed(phase: String) -> void:
 
 func _on_anomaly_changed(value: float) -> void:
     signal_bar.value = value
+
+func _on_prompt_changed(text: String) -> void:
+    prompt_label.text = text
 
 func _on_log_added(message: String, severity: String) -> void:
     var color := "#8fffc9" if severity == "good" else ("#ffc76b" if severity == "warning" else "#ff7a8a")
