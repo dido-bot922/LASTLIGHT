@@ -4,20 +4,10 @@ signal resources_changed(resources: Dictionary)
 signal log_added(message: String, severity: String)
 signal anomaly_changed(value: float)
 
-var resources := {
-    "energy": 82.0,
-    "oxygen": 96.0,
-    "fuel": 74.0,
-    "temperature": 21.0,
-    "radiation": 3.0,
-    "signal": 0.0
-}
+var resources := {"energy": 82.0, "oxygen": 96.0, "fuel": 74.0, "temperature": 21.0, "radiation": 3.0, "signal": 0.0}
 var systems := {"power": false, "life_support": false, "comms": false, "science": false}
 var mission_time := 0.0
 var anomaly_progress := 0.0
-
-func _ready() -> void:
-    set_process(true)
 
 func _process(delta: float) -> void:
     mission_time += delta
@@ -34,18 +24,12 @@ func _process(delta: float) -> void:
     resources_changed.emit(resources)
 
 func operate(system: String) -> String:
+    if not systems.has(system):
+        return "UNKNOWN"
     systems[system] = not systems[system]
-    var active := systems[system]
-    var state := "ONLINE" if active else "STANDBY"
-    match system:
-        "power":
-            log_added.emit("REATOR: núcleo de distribuição em %s" % state, "good")
-        "life_support":
-            log_added.emit("SUPORTE DE VIDA: protocolos %s" % state, "good")
-        "comms":
-            log_added.emit("COMUNICAÇÕES: matriz de escuta %s" % state, "good")
-        "science":
-            log_added.emit("LABORATÓRIO: instrumentos %s" % state, "good")
+    var state := "ONLINE" if systems[system] else "STANDBY"
+    var names := {"power": "REATOR", "life_support": "SUPORTE DE VIDA", "comms": "COMUNICAÇÕES", "science": "LABORATÓRIO"}
+    log_added.emit("%s: protocolos %s" % [names[system], state], "good")
     resources_changed.emit(resources)
     return state
 
