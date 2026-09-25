@@ -4,8 +4,30 @@ class_name LL_RuntimeBridge
 var booted := false
 var elapsed := 0.0
 var event_count := 0
+var last_sync := 0.0
+var sync_interval := 0.25
 
 func _ready() -> void:
+    _connect_runtime_signals()
+    booted = true
+    EventBus.post("Núcleo de integração LASTLIGHT online.", "good")
+
+func _process(delta: float) -> void:
+    if not booted:
+        return
+    elapsed += delta
+    last_sync += delta
+    if Input.is_action_just_pressed("quick_save"):
+        SaveManager.save_profile({"runtime_seconds": elapsed, "events": event_count})
+    if Input.is_action_just_pressed("quick_load"):
+        SaveManager.load_profile()
+    _balance_resource_rates()
+    _run_safety_checks()
+    if last_sync >= sync_interval:
+        last_sync = 0.0
+        _sync_legacy_state()
+
+func _connect_runtime_signals() -> void:
     if not EventBus.notification.is_connected(_on_notification):
         EventBus.notification.connect(_on_notification)
     if not ResourceSystem.critical.is_connected(_on_resource_critical):
@@ -20,19 +42,6 @@ func _ready() -> void:
         ShipAI.spoken.connect(_on_ai_spoken)
     if not AlienSignal.pattern_detected.is_connected(_on_pattern_detected):
         AlienSignal.pattern_detected.connect(_on_pattern_detected)
-    booted = true
-    EventBus.post("Núcleo de integração LASTLIGHT online.", "good")
-
-func _process(delta: float) -> void:
-    if not booted:
-        return
-    elapsed += delta
-    if Input.is_action_just_pressed("quick_save"):
-        SaveManager.save_profile({"runtime_seconds": elapsed, "events": event_count})
-    if Input.is_action_just_pressed("quick_load"):
-        SaveManager.load_profile()
-    _balance_resource_rates()
-    _run_safety_checks()
 
 func _balance_resource_rates() -> void:
     var reactor_online: bool = GameState.systems.get("reactor", false)
@@ -44,6 +53,14 @@ func _balance_resource_rates() -> void:
     ResourceSystem.set_rate("signal", 0.035 if comms_online else -0.018)
     ResourceSystem.set_rate("temperature", 0.0 if life_support_online else -0.02)
     ResourceSystem.set_rate("radiation", 0.006 if NavigationSystem.travelling else 0.0)
+
+func _sync_legacy_state() -> void:
+    for id in ResourceSystem.values:
+        if GameState.resources.has(id):
+            GameState.resources[id] = ResourceSystem.get_value(id)
+    GameState.resources_changed.emit(GameState.resources)
+    GameState.anomaly_progress = ResourceSystem.get_value("signal")
+    GameState.anomaly_changed.emit(GameState.anomaly_progress)
 
 func _run_safety_checks() -> void:
     if ResourceSystem.get_value("oxygen") < 30.0 and not FailureSystem.has("oxygen_scrubber"):

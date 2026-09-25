@@ -2,7 +2,7 @@ extends Node
 class_name LL_LineCounter
 
 func count_project_lines() -> Dictionary:
-    var result := {"gdscript": 0, "files": 0, "non_empty": 0}
+    var result := {"gdscript": 0, "files": 0, "non_empty": 0, "comments": 0}
     _walk("res://scripts", result)
     return result
 
@@ -32,10 +32,13 @@ func _count_file(path: String, result: Dictionary) -> void:
     while not file.eof_reached():
         var line := file.get_line()
         result.gdscript += 1
-        if not line.strip_edges().is_empty():
+        var clean := line.strip_edges()
+        if not clean.is_empty():
             result.non_empty += 1
+        if clean.begins_with("#"):
+            result.comments += 1
     file.close()
 
 func report() -> String:
     var counts := count_project_lines()
-    return "GDScript: %d linhas | não vazias: %d | arquivos: %d" % [counts.gdscript, counts.non_empty, counts.files]
+    return "GDScript: %d linhas | não vazias: %d | comentários: %d | arquivos: %d" % [counts.gdscript, counts.non_empty, counts.comments, counts.files]
