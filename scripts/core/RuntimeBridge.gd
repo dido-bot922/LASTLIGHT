@@ -6,6 +6,8 @@ var elapsed := 0.0
 var event_count := 0
 var last_sync := 0.0
 var sync_interval := 0.25
+var last_player_position := Vector3.ZERO
+var has_player_position := false
 
 func _ready() -> void:
     _connect_runtime_signals()
@@ -17,8 +19,9 @@ func _process(delta: float) -> void:
         return
     elapsed += delta
     last_sync += delta
+    _track_player()
     if Input.is_action_just_pressed("quick_save"):
-        SaveManager.save_profile({"runtime_seconds": elapsed, "events": event_count})
+        SaveManager.save_profile({"runtime_seconds": elapsed, "events": event_count, "mission": GameState.snapshot()})
     if Input.is_action_just_pressed("quick_load"):
         SaveManager.load_profile()
     _balance_resource_rates()
@@ -42,6 +45,22 @@ func _connect_runtime_signals() -> void:
         ShipAI.spoken.connect(_on_ai_spoken)
     if not AlienSignal.pattern_detected.is_connected(_on_pattern_detected):
         AlienSignal.pattern_detected.connect(_on_pattern_detected)
+    if not EnvironmentalHazardSystem.hazard_entered.is_connected(_on_hazard_entered):
+        EnvironmentalHazardSystem.hazard_entered.connect(_on_hazard_entered)
+    if not EnvironmentalHazardSystem.hazard_exited.is_connected(_on_hazard_exited):
+        EnvironmentalHazardSystem.hazard_exited.connect(_on_hazard_exited)
+
+func _track_player() -> void:
+    var player := get_tree().current_scene.get_node_or_null("Player") if get_tree().current_scene != null else null
+    if player == null or not player is Node3D:
+        return
+    var position_3d: Vector3 = player.global_position
+    if has_player_position and position_3d.distance_to(last_player_position) > 0.001:
+        MissionTelemetry.track_position(position_3d)
+    elif not has_player_position:
+        MissionTelemetry.track_position(position_3d)
+    last_player_position = position_3d
+    has_player_position = true
 
 func _balance_resource_rates() -> void:
     var reactor_online: bool = GameState.systems.get("reactor", false)
@@ -78,16 +97,27 @@ func _on_resource_critical(id: String, value: float) -> void:
     EventBus.post("Limite crítico: %s = %.1f" % [id, value], "warning")
 
 func _on_failure_opened(id: String, _description: String) -> void:
+    MissionTelemetry.increment("failures_resolved", 0.0)
     EventBus.remember("failure_opened", {"id": id})
 
 func _on_experiment_completed(id: String, quality: float) -> void:
+    MissionTelemetry.increment("experiments")
     EventBus.remember("science_result", {"id": id, "quality": quality})
 
 func _on_transfer_started(destination: String) -> void:
+    AtmosphereDirector.set_phase("uneasy")
+    EventBus.post("Transferência iniciada para " + destination + ".", "critical")
     EventBus.remember("transfer_started", {"destination": destination})
 
 func _on_ai_spoken(text: String) -> void:
     EventBus.remember("ai_message", {"text": text})
 
 func _on_pattern_detected(pattern: String, confidence: float) -> void:
+    MissionTelemetry.increment("signals_observed")
     EventBus.remember("alien_pattern", {"pattern": pattern, "confidence": confidence})
+
+func _on_hazard_entered(id: String) -> void:
+    EventBus.remember("hazard_entered", {"id": id})
+
+func _on_hazard_exited(id: String) -> void:
+    EventBus.remember("hazard_exited", {"id": id})

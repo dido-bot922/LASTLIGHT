@@ -2,19 +2,22 @@
 config/name="LASTLIGHT"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.3")
-config/version="0.5.0"
+config/version="0.6.0"
 
 [autoload]
 GameState="*res://scripts/GameState.gd"
 EventBus="*res://scripts/core/EventBus.gd"
 ResourceSystem="*res://scripts/systems/ResourceSystem.gd"
 FailureSystem="*res://scripts/systems/FailureSystem.gd"
+EnvironmentalHazardSystem="*res://scripts/systems/EnvironmentalHazardSystem.gd"
 ScienceLab="*res://scripts/systems/ScienceLab.gd"
 NavigationSystem="*res://scripts/systems/NavigationSystem.gd"
 ShipAI="*res://scripts/ai/ShipAI.gd"
 AlienSignal="*res://scripts/ai/AlienSignal.gd"
 Campaign="*res://scripts/campaign/Campaign.gd"
 SaveManager="*res://scripts/core/SaveManager.gd"
+SaveJournal="*res://scripts/core/SaveJournal.gd"
+MissionTelemetry="*res://scripts/core/MissionTelemetry.gd"
 AudioDirector="*res://scripts/presentation/AudioDirector.gd"
 AtmosphereDirector="*res://scripts/presentation/AtmosphereDirector.gd"
 ResearchArchive="*res://scripts/science/ResearchArchive.gd"
