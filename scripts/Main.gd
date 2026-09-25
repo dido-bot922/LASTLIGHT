@@ -9,7 +9,7 @@ func _ready() -> void:
     _build_player()
     _build_hud()
     _build_director()
-    GameState.log_added.emit("AURORA-7 pronta. A missão começa dentro da nave.", "good")
+    GameState.log_added.emit("AURORA-7 online. Preparação da missão iniciada.", "good")
 
 func _build_ship() -> void:
     add_child(ShipCore.new())
@@ -17,7 +17,7 @@ func _build_ship() -> void:
 func _build_player() -> void:
     var player := CharacterBody3D.new()
     player.name = "Player"
-    player.position = Vector3(0.0, 0.05, 5.0)
+    player.position = Vector3(0.0, 0.2, 4.8)
     player.set_script(preload("res://scripts/Player.gd"))
     var collision := CollisionShape3D.new()
     var capsule := CapsuleShape3D.new()
@@ -29,7 +29,8 @@ func _build_player() -> void:
     add_child(player)
 
 func _build_hud() -> void:
-    add_child(HUD.new())
+    var hud := HUD.new()
+    add_child(hud)
 
 func _build_director() -> void:
     add_child(MissionDirector.new())

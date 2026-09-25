@@ -1,14 +1,14 @@
 extends Node
-class_name GameState
 
 signal resources_changed(resources: Dictionary)
 signal log_added(message: String, severity: String)
 signal anomaly_changed(value: float)
 signal objective_changed(title: String, description: String)
 signal mission_phase_changed(phase: String)
-signal journal_updated(entry: String)
-signal diagnostic_report(text: String)
-signal cipher_progress(value: float)
+
+var phase := "EARTH_PREP"
+var objective_title := "Preparar a missão"
+var objective_description := "Ative reinicialização do reator, suporte de vida, comunicações e laboratório."
 
 var resources := {
     "energy": 82.0,
@@ -25,90 +25,79 @@ var systems := {
     "comms": false,
     "science": false,
     "thrusters": false,
-    "navigation": false
+    "navigation": false,
+    "airlock": false
 }
 
-var phase := "EARTH_PREP"
 var anomaly_progress := 0.0
-var ticks := 0.0
-var max_scan_count := 5
-var scans_performed := 0
-var objective_title := "Preparar a missão"
-var objective_description := "Ative o reator, suporte de vida, comunicação e laboratório para preparar a nave."
+var scans_completed := 0
+var scan_goal := 5
 
 func _ready() -> void:
     set_process(true)
-    emit_signal("objective_changed", objective_title, objective_description)
-    emit_signal("mission_phase_changed", phase)
+    objective_changed.emit(objective_title, objective_description)
+    mission_phase_changed.emit(phase)
 
 func _process(delta: float) -> void:
-    ticks += delta
-    _simulate_resources(delta)
+    _simulate_systems(delta)
 
-func _simulate_resources(delta: float) -> void:
+func _simulate_systems(delta: float) -> void:
     if systems.reactor:
-        resources.energy = max(0.0, resources.energy - delta * 0.014)
+        resources.energy = max(0.0, resources.energy - delta * 0.012)
         resources.fuel = max(0.0, resources.fuel - delta * 0.006)
-    if systems.life_support:
-        resources.oxygen = min(100.0, resources.oxygen + delta * 0.02)
-        resources.temperature = move_toward(resources.temperature, 21.0, delta * 0.02)
     else:
-        resources.oxygen = max(0.0, resources.oxygen - delta * 0.009)
-        resources.temperature = move_toward(resources.temperature, 14.0, delta * 0.014)
+        resources.energy = min(100.0, resources.energy + delta * 0.006)
+
+    if systems.life_support:
+        resources.oxygen = min(100.0, resources.oxygen + delta * 0.025)
+        resources.temperature = move_toward(resources.temperature, 21.0, delta * 0.015)
+    else:
+        resources.oxygen = max(0.0, resources.oxygen - delta * 0.01)
+        resources.temperature = move_toward(resources.temperature, 14.0, delta * 0.015)
 
     if systems.comms:
-        resources.signal = min(100.0, resources.signal + delta * 0.03)
+        resources.signal = min(100.0, resources.signal + delta * 0.025)
     else:
         resources.signal = max(0.0, resources.signal - delta * 0.02)
 
-    resources.radiation = clamp(resources.radiation + sin(ticks * 0.12) * delta * 0.05, 0.0, 100.0)
+    resources.radiation = clamp(resources.radiation + sin(TAU * 0.2 * (OS.get_ticks_msec() / 1000.0)) * delta * 0.05, 0.0, 100.0)
     resources_changed.emit(resources)
 
-func toggle_system(id: String) -> String:
-    if not systems.has(id):
-        return "UNKNOWN"
-    systems[id] = not systems[id]
-    var state := "ONLINE" if systems[id] else "STANDBY"
-    log_added.emit("%s: %s" % [id.to_upper(), state], "good")
-    resources_changed.emit(resources)
-    return state
+func advance_phase(next_phase: String) -> void:
+    phase = next_phase
+    mission_phase_changed.emit(next_phase)
 
 func set_objective(title: String, description: String) -> void:
     objective_title = title
     objective_description = description
     objective_changed.emit(title, description)
 
-func advance_phase(next_phase: String) -> void:
-    phase = next_phase
-    mission_phase_changed.emit(next_phase)
-
-func add_journal_entry(text: String) -> void:
-    journal_updated.emit(text)
-    log_added.emit(text, "good")
+func toggle_system(system_name: String) -> String:
+    if not systems.has(system_name):
+        return "UNKNOWN"
+    systems[system_name] = not systems[system_name]
+    var state := "ONLINE" if systems[system_name] else "STANDBY"
+    log_added.emit("%s: %s" % [system_name.to_upper(), state], "good")
+    resources_changed.emit(resources)
+    return state
 
 func analyze_signal() -> void:
     if not systems.science or not systems.comms:
-        log_added.emit("Ative LABORATÓRIO e COMUNICAÇÕES para analisar o sinal.", "warning")
+        log_added.emit("Ative laboratório e comunicações antes da análise.", "warning")
         return
 
-    scans_performed += 1
+    scans_completed += 1
     anomaly_progress = min(100.0, anomaly_progress + 20.0)
-    resources.signal = min(100.0, resources.signal + 18.0)
+    resources.signal = min(100.0, resources.signal + 12.0)
     anomaly_changed.emit(anomaly_progress)
-    cipher_progress.emit(anomaly_progress)
 
-    if scans_performed >= max_scan_count:
-        var msg := "PADRÃO PRINCIPAL DECODIFICADO: o sinal é estruturado, intencional e não natural."
-        log_added.emit(msg, "critical")
-        diagnostic_report.emit(msg)
+    if scans_completed >= scan_goal:
+        log_added.emit("SINAL DECODIFICADO: a emissão tem padrão inteligível e não natural.", "critical")
     else:
-        var msg := "Leitura %d/%d concluída. Padrão ressonante detectado." % [scans_performed, max_scan_count]
-        log_added.emit(msg, "good")
-        diagnostic_report.emit(msg)
+        log_added.emit("Leitura %d/%d concluída. Padrão ressonante detectado." % [scans_completed, scan_goal], "good")
 
-func reset_progress() -> void:
+func reset_signal() -> void:
+    scans_completed = 0
     anomaly_progress = 0.0
-    scans_performed = 0
     resources.signal = 0.0
     anomaly_changed.emit(anomaly_progress)
-    cipher_progress.emit(anomaly_progress)

@@ -2,7 +2,7 @@
 config/name="LASTLIGHT"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.3")
-config/version="0.1.0"
+config/version="0.2.0"
 
 [autoload]
 GameState="*res://scripts/GameState.gd"

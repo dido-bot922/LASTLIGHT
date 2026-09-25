@@ -6,11 +6,12 @@ extends CharacterBody3D
 @export var acceleration := 18.0
 @export var gravity := 18.0
 
-var pitch := 0.0
 var camera: Camera3D
+var pitch := 0.0
 
 func _ready() -> void:
     camera = Camera3D.new()
+    camera.name = "Camera3D"
     camera.position = Vector3(0.0, 1.55, 0.0)
     camera.current = true
     add_child(camera)
@@ -47,9 +48,9 @@ func _physics_process(delta: float) -> void:
     move_and_slide()
 
 func _interact() -> void:
-    var origin := camera.global_position
-    var target := origin - camera.global_transform.basis.z * 3.0
-    var query := PhysicsRayQueryParameters3D.create(origin, target)
+    var from := camera.global_position
+    var to := from - camera.global_transform.basis.z * 3.0
+    var query := PhysicsRayQueryParameters3D.create(from, to)
     query.exclude = [self]
     var result := get_world_3d().direct_space_state.intersect_ray(query)
     if not result.is_empty() and result.collider.has_method("interact"):
