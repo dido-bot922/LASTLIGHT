@@ -8,31 +8,28 @@ func _ready() -> void:
     _build_ship()
     _build_player()
     _build_hud()
-    _spawn_director()
-    GameState.log_added.emit("Preparação de missão iniciada. O primeiro sinal está chegando.", "good")
+    _build_director()
+    GameState.log_added.emit("AURORA-7 pronta. A missão começa dentro da nave.", "good")
 
 func _build_ship() -> void:
-    var ship := ShipCore.new()
-    add_child(ship)
+    add_child(ShipCore.new())
 
 func _build_player() -> void:
-    var body := CharacterBody3D.new()
-    body.name = "Player"
-    body.position = Vector3(0.0, 0.2, 5.2)
-    body.set_script(preload("res://scripts/Player.gd"))
+    var player := CharacterBody3D.new()
+    player.name = "Player"
+    player.position = Vector3(0.0, 0.05, 5.0)
+    player.set_script(preload("res://scripts/Player.gd"))
     var collision := CollisionShape3D.new()
-    var shape := CapsuleShape3D.new()
-    shape.radius = 0.38
-    shape.height = 1.8
-    collision.shape = shape
+    var capsule := CapsuleShape3D.new()
+    capsule.radius = 0.38
+    capsule.height = 1.8
+    collision.shape = capsule
     collision.position.y = 0.9
-    body.add_child(collision)
-    add_child(body)
+    player.add_child(collision)
+    add_child(player)
 
 func _build_hud() -> void:
-    var hud := HUD.new()
-    add_child(hud)
+    add_child(HUD.new())
 
-func _spawn_director() -> void:
-    var director := MissionDirector.new()
-    add_child(director)
+func _build_director() -> void:
+    add_child(MissionDirector.new())

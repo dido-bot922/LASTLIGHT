@@ -1,41 +1,40 @@
 extends Node
 class_name MissionDirector
 
-signal objective_changed(title: String, description: String)
-signal mission_phase_changed(phase: String)
-
 var current_phase := "EARTH_PREP"
+var transition_lock := false
 
 func _ready() -> void:
-    GameState.objective_changed.connect(_on_objective_changed)
-    GameState.mission_phase_changed.connect(_on_phase_changed)
-    _apply_phase("EARTH_PREP")
+    _set_phase("EARTH_PREP")
 
 func _process(_delta: float) -> void:
-    if current_phase == "EARTH_PREP":
-        if GameState.systems.reactor and GameState.systems.life_support and GameState.systems.comms and GameState.systems.science:
-            GameState.advance_phase("LAUNCH")
-            _apply_phase("LAUNCH")
-    elif current_phase == "LAUNCH":
-        if GameState.anomaly_progress >= 100.0 and GameState.resources.fuel >= 50.0:
-            GameState.advance_phase("SPACE_TRAVEL")
-            _apply_phase("SPACE_TRAVEL")
+    if transition_lock:
+        return
+    if current_phase == "EARTH_PREP" and _all_preflight_systems_ready():
+        _set_phase("SIGNAL_ANALYSIS")
+    elif current_phase == "SIGNAL_ANALYSIS" and GameState.anomaly_progress >= 100.0:
+        _set_phase("LAUNCH_READY")
+    elif current_phase == "LAUNCH_READY" and GameState.systems.thrusters and GameState.systems.navigation:
+        _set_phase("SPACE_TRAVEL")
 
-func _apply_phase(name: String) -> void:
-    current_phase = name
-    match name:
+func _all_preflight_systems_ready() -> bool:
+    return GameState.systems.reactor and GameState.systems.life_support and GameState.systems.comms and GameState.systems.science
+
+func _set_phase(next_phase: String) -> void:
+    transition_lock = true
+    current_phase = next_phase
+    GameState.advance_phase(next_phase)
+    match next_phase:
         "EARTH_PREP":
-            GameState.set_objective("Preparar a missão", "Ative reator, suporte de vida, comunicação e laboratório antes do lançamento.")
-            GameState.log_added.emit("Objetivo inicial: preparar a nave para a missão de partida.", "good")
-        "LAUNCH":
-            GameState.set_objective("Lançamento", "Conclua o diagnóstico do sinal e valide os sistemas para partir.")
-            GameState.log_added.emit("Lançamento liberado. O sinal responde ao laboratório.", "critical")
+            GameState.set_objective("Preparar a missão", "Ative reator, suporte de vida, comunicação e laboratório.")
+        "SIGNAL_ANALYSIS":
+            GameState.set_objective("Investigar o sinal", "Realize cinco leituras no terminal científico.")
+            GameState.log_added.emit("Todos os sistemas básicos respondem. O sinal precisa de uma análise completa.", "good")
+        "LAUNCH_READY":
+            GameState.set_objective("Validar lançamento", "Ative propulsão e navegação para liberar a partida.")
+            GameState.log_added.emit("A análise revelou uma emissão deliberada. A janela de lançamento está aberta.", "critical")
         "SPACE_TRAVEL":
-            GameState.set_objective("Viagem espacial", "A nave deve deixar o sistema terrestre e avançar rumo ao desconhecido.")
-            GameState.log_added.emit("Sistema de propulsão otimizado. O campo de viagem foi aberto.", "critical")
-
-func _on_objective_changed(_title: String, _description: String) -> void:
-    pass
-
-func _on_phase_changed(_phase: String) -> void:
-    pass
+            GameState.set_objective("Cruzar o vazio", "Mantenha os sistemas estáveis durante a primeira transferência orbital.")
+            GameState.log_added.emit("AURORA-7 deixou a órbita terrestre. O silêncio agora é absoluto.", "critical")
+    await get_tree().process_frame
+    transition_lock = false
