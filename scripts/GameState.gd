@@ -6,6 +6,9 @@ signal log_added(message: String, severity: String)
 signal anomaly_changed(value: float)
 signal objective_changed(title: String, description: String)
 signal mission_phase_changed(phase: String)
+signal journal_updated(entry: String)
+signal diagnostic_report(text: String)
+signal cipher_progress(value: float)
 
 var resources := {
     "energy": 82.0,
@@ -31,7 +34,7 @@ var ticks := 0.0
 var max_scan_count := 5
 var scans_performed := 0
 var objective_title := "Preparar a missão"
-var objective_description := "Acorde a nave, estabilize os sistemas e prepare o lançamento."
+var objective_description := "Ative o reator, suporte de vida, comunicação e laboratório para preparar a nave."
 
 func _ready() -> void:
     set_process(true)
@@ -79,6 +82,10 @@ func advance_phase(next_phase: String) -> void:
     phase = next_phase
     mission_phase_changed.emit(next_phase)
 
+func add_journal_entry(text: String) -> void:
+    journal_updated.emit(text)
+    log_added.emit(text, "good")
+
 func analyze_signal() -> void:
     if not systems.science or not systems.comms:
         log_added.emit("Ative LABORATÓRIO e COMUNICAÇÕES para analisar o sinal.", "warning")
@@ -88,14 +95,20 @@ func analyze_signal() -> void:
     anomaly_progress = min(100.0, anomaly_progress + 20.0)
     resources.signal = min(100.0, resources.signal + 18.0)
     anomaly_changed.emit(anomaly_progress)
+    cipher_progress.emit(anomaly_progress)
 
     if scans_performed >= max_scan_count:
-        log_added.emit("PADRÃO PRINCIPAL DECODIFICADO: o sinal é estruturado, intencional e não natural.", "critical")
+        var msg := "PADRÃO PRINCIPAL DECODIFICADO: o sinal é estruturado, intencional e não natural."
+        log_added.emit(msg, "critical")
+        diagnostic_report.emit(msg)
     else:
-        log_added.emit("Leitura %d/%d concluída. Padrão ressonante detectado." % [scans_performed, max_scan_count], "good")
+        var msg := "Leitura %d/%d concluída. Padrão ressonante detectado." % [scans_performed, max_scan_count]
+        log_added.emit(msg, "good")
+        diagnostic_report.emit(msg)
 
 func reset_progress() -> void:
     anomaly_progress = 0.0
     scans_performed = 0
     resources.signal = 0.0
     anomaly_changed.emit(anomaly_progress)
+    cipher_progress.emit(anomaly_progress)
