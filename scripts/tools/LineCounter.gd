@@ -2,7 +2,7 @@ extends Node
 class_name LL_LineCounter
 
 func count_project_lines() -> Dictionary:
-    var result := {"gdscript": 0, "files": 0, "non_empty": 0, "comments": 0}
+    var result := {"gdscript": 0, "files": 0, "non_empty": 0, "comments": 0, "code": 0}
     _walk("res://scripts", result)
     return result
 
@@ -11,17 +11,15 @@ func _walk(path: String, result: Dictionary) -> void:
     if directory == null:
         return
     directory.list_dir_begin()
-    var name := directory.get_next()
-    while name != "":
-        if name.begins_with("."):
-            name = directory.get_next()
-            continue
-        var full := path.path_join(name)
-        if directory.current_is_dir():
-            _walk(full, result)
-        elif name.ends_with(".gd"):
-            _count_file(full, result)
-        name = directory.get_next()
+    var entry := directory.get_next()
+    while entry != "":
+        if not entry.begins_with("."):
+            var full := path.path_join(entry)
+            if directory.current_is_dir():
+                _walk(full, result)
+            elif entry.ends_with(".gd"):
+                _count_file(full, result)
+        entry = directory.get_next()
     directory.list_dir_end()
 
 func _count_file(path: String, result: Dictionary) -> void:
@@ -29,16 +27,19 @@ func _count_file(path: String, result: Dictionary) -> void:
     if file == null:
         return
     result.files += 1
-    while not file.eof_reached():
-        var line := file.get_line()
+    var lines := file.get_as_text().split("\n", false)
+    file.close()
+    for line in lines:
         result.gdscript += 1
         var clean := line.strip_edges()
-        if not clean.is_empty():
-            result.non_empty += 1
+        if clean.is_empty():
+            continue
+        result.non_empty += 1
         if clean.begins_with("#"):
             result.comments += 1
-    file.close()
+        else:
+            result.code += 1
 
 func report() -> String:
     var counts := count_project_lines()
-    return "GDScript: %d linhas | não vazias: %d | comentários: %d | arquivos: %d" % [counts.gdscript, counts.non_empty, counts.comments, counts.files]
+    return "GDScript: %d | código: %d | não vazias: %d | comentários: %d | arquivos: %d" % [counts.gdscript, counts.code, counts.non_empty, counts.comments, counts.files]
